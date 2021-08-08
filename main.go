@@ -2,11 +2,16 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"go/ast"
 	"go/parser"
+	"go/printer"
 	"go/token"
 	"log"
 	"os"
+	"strconv"
+
+	"github.com/k0kubun/pp"
 )
 
 func main() {
@@ -23,8 +28,8 @@ func main() {
 	} else {
 		src = `package main
 
-func MerryXMas() {
-    var hoge = 2
+func reti(i int) {
+	return i
 }`
 	}
 
@@ -34,7 +39,44 @@ func MerryXMas() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	insertHello(f)
 
-	ast.Print(fset, f)
+	prer := &printer.Config{Tabwidth: 8, Mode: printer.UseSpaces | printer.TabIndent}
+	prer.Fprint(os.Stdout, fset, f)
 
+	// ast.Print(fset, f)
+
+}
+
+func insertHello(f *ast.File) {
+
+	hello := &ast.ExprStmt{
+		X: &ast.CallExpr{
+			Fun: &ast.SelectorExpr{
+				X:   ast.NewIdent("fmt"),
+				Sel: ast.NewIdent("Println"),
+			},
+			Args: []ast.Expr{
+				&ast.BasicLit{
+					Kind:  token.STRING,
+					Value: strconv.Quote("Hello, world"),
+				},
+			},
+		}}
+
+	decls := f.Decls
+	for _, dec := range decls {
+		switch dec := interface{}(dec).(type) {
+		case *ast.FuncDecl:
+			pp.Printf("%v is function.\n", dec.Name.Name)
+			pp.Println(dec)
+			dec.Body.List = append([]ast.Stmt{hello}, dec.Body.List...)
+			pp.Println(dec)
+		case *ast.GenDecl:
+			// pp.Printf("%v is not function.\n", dec.Tok)
+			// pp.Printf("specs: %v\n", dec.Specs)
+		default:
+			fmt.Printf("%T\n", dec)
+		}
+	}
 }
